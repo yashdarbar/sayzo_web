@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { jobs } from "@/public/data/job";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import {
+  subscribeToApprovedTasks,
+  subscribeToApplicationsByApplicant
+} from "@/lib/firebase";
+import { jobs as dummyJobs } from "@/public/data/job";
+import { useAuth } from "@/app/Context/AuthContext";
 
 import JobCard from "@/components/Job/JobCard";
 import JobDetailPanel from "@/components/Job/JobDetailPanel";
@@ -9,21 +14,115 @@ import JobBottomSheet from "@/components/Job/JobBottomSheet";
 import SearchWithPagination from "@/components/SearchWithPagination";
 import CustomIcons from "@/components/CustomIcons";
 import MegaMenu from "./MegaMenu";
+import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 
-export const metadata = {
-  title: "Use Cases | How to use SAYZO",
-  description: "Discover real-world examples of how people are using SAYZO to solve problems and find local help.",
-  openGraph: {
-    title: "SAYZO Use Cases",
-    url: "https://sayzo.in/use-cases",
+// Map Firestore task to job card format
+const mapTaskToJob = (task) => ({
+  id: task.id,
+  giverId: task.giverId, // Preserve for ownership check
+  type: task.taskType || "online",
+  title: task.taskName || "Untitled Task",
+  deadline: task.duration || "Flexible",
+  price: task.amount || "0",
+  work_mode: task.location === "Online" ? "Online" : "Offline",
+  skills: task.skills ? task.skills.split(",").map((s) => s.trim()) : [],
+  tags: task.skills ? task.skills.split(",").map((s) => s.trim()) : [],
+  description: task.description || "",
+  company: {
+    name: task.customerName || "Anonymous",
+    about: "Verified task giver on the platform",
   },
-};
+  budget: {
+    amount: `₹${task.amount || "0"}`,
+    type: task.budgetType === "fixed" ? "Fixed" : "Open to Negotiate",
+  },
+  duration: task.duration || "Flexible",
+});
 
-const UserPage = () => {
+const UserPage = ({ mode = "live" }) => {
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [selectedJob, setSelectedJob] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [isMobile, setIsMobile] = useState(false);
+  const [myApplications, setMyApplications] = useState([]);
+
+  // Use centralized auth context
+  const { user: currentUser } = useAuth();
+
+  // Retry handler for error recovery
+  const handleRetry = useCallback(() => {
+    setError("");
+    setLoading(true);
+    // Force re-mount by updating key (subscriptions will re-establish)
+    window.location.reload();
+  }, []);
+
+  /* ================= REAL-TIME TASKS SUBSCRIPTION ================= */
+  useEffect(() => {
+    // Showcase mode: Show only dummy data, no auth required
+    if (mode === "showcase") {
+      setJobs(dummyJobs);
+      setMyApplications([]);
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    // Real-time subscription to approved tasks
+    const unsubscribeTasks = subscribeToApprovedTasks(
+      (tasks) => {
+        if (!isMounted) return;
+        const mappedJobs = tasks.map(mapTaskToJob);
+        setJobs(mappedJobs);
+        setLoading(false);
+        setError("");
+      },
+      (err) => {
+        if (!isMounted) return;
+        console.error("Tasks subscription error:", err);
+        setError("Failed to load tasks. Please try again.");
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      if (unsubscribeTasks) unsubscribeTasks();
+    };
+  }, [mode]);
+
+  /* ================= APPLICATIONS SUBSCRIPTION ================= */
+  useEffect(() => {
+    if (mode === "showcase" || !currentUser) {
+      setMyApplications([]);
+      return;
+    }
+
+    let isMounted = true;
+
+    // Real-time subscription to user's applications
+    const unsubscribeApps = subscribeToApplicationsByApplicant(
+      currentUser.uid,
+      (applications) => {
+        if (!isMounted) return;
+        setMyApplications(applications);
+      },
+      (err) => {
+        if (!isMounted) return;
+        console.error("Applications subscription error:", err);
+        // Don't show error for applications - just log it
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      if (unsubscribeApps) unsubscribeApps();
+    };
+  }, [mode, currentUser]);
 
   /* ================= SCREEN SIZE ================= */
   useEffect(() => {
@@ -40,10 +139,7 @@ const UserPage = () => {
   }, [searchQuery]);
 
   /* ================= PAGINATION ================= */
-  const ITEMS_PER_PAGE = useMemo(
-    () => (isMobile ? 10 : 15),
-    [isMobile]
-  );
+  const ITEMS_PER_PAGE = useMemo(() => (isMobile ? 10 : 15), [isMobile]);
 
   /* ================= SEARCH + FILTER ================= */
   const filteredJobs = useMemo(() => {
@@ -52,26 +148,75 @@ const UserPage = () => {
     const query = searchQuery.toLowerCase();
 
     return jobs.filter((job) => {
-      const titleMatch = job.title.toLowerCase().includes(query);
+      const titleMatch = job.title?.toLowerCase().includes(query);
       const categoryMatch = job.category?.toLowerCase().includes(query);
-      const skillsMatch = job.tags?.some((tag) =>
+      const skillsMatch = job.skills?.some((tag) =>
         tag.toLowerCase().includes(query)
       );
 
       return titleMatch || categoryMatch || skillsMatch;
     });
-  }, [searchQuery]);
+  }, [searchQuery, jobs]);
 
   const totalPages = Math.ceil(filteredJobs.length / ITEMS_PER_PAGE);
 
   useEffect(() => {
-    if (currentPage > totalPages) setCurrentPage(1);
+    if (currentPage > totalPages && totalPages > 0) setCurrentPage(1);
   }, [currentPage, totalPages]);
 
   const paginatedJobs = filteredJobs.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
+
+  /* ================= APPLICATION HELPERS ================= */
+  const hasApplied = (taskId) => {
+    return myApplications.some((app) => app.taskId === taskId);
+  };
+
+  const isOwnTask = (task) => {
+    // Return false if user is not authenticated or task has no giverId
+    if (!currentUser?.uid || !task?.giverId) return false;
+    return task.giverId === currentUser.uid;
+  };
+
+  const handleApplicationSuccess = useCallback(() => {
+    // With real-time subscriptions, applications will auto-update
+    // This callback can still be used for optimistic UI updates if needed
+    console.log("Application submitted - subscription will auto-update");
+  }, []);
+
+  /* ================= ERROR STATE ================= */
+  if (error && !loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center max-w-md mx-auto px-4">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-800 mb-2">Something went wrong</h3>
+          <p className="text-gray-500 mb-6">{error}</p>
+          <button
+            onClick={handleRetry}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary-btn text-white rounded-full font-medium hover:bg-opacity-90 transition"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ================= LOADING STATE ================= */
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 animate-spin text-primary-btn mx-auto mb-4" />
+          <p className="text-gray-500">Loading tasks...</p>
+        </div>
+      </div>
+    );
+  }
 
   /* ================================================= */
   return (
@@ -120,13 +265,18 @@ const UserPage = () => {
               <JobDetailPanel
                 job={selectedJob}
                 onClose={() => setSelectedJob(null)}
+                currentUser={currentUser}
+                hasApplied={hasApplied(selectedJob?.id)}
+                isOwnTask={isOwnTask(selectedJob)}
+                onApplicationSuccess={handleApplicationSuccess}
+                mode={mode}
               />
             </section>
           )}
 
           {filteredJobs.length === 0 && (
             <div className="text-center py-20 text-gray-400">
-              No jobs match your search
+              No tasks match your search
             </div>
           )}
 
@@ -153,7 +303,7 @@ const UserPage = () => {
 
           {filteredJobs.length === 0 && (
             <div className="text-center py-20 text-gray-400">
-              No jobs match your search
+              No tasks match your search
             </div>
           )}
 
@@ -167,6 +317,11 @@ const UserPage = () => {
             <JobBottomSheet
               job={selectedJob}
               onClose={() => setSelectedJob(null)}
+              currentUser={currentUser}
+              hasApplied={hasApplied(selectedJob?.id)}
+              isOwnTask={isOwnTask(selectedJob)}
+              onApplicationSuccess={handleApplicationSuccess}
+              mode={mode}
             />
           )}
         </section>

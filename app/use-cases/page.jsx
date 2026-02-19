@@ -23,7 +23,7 @@ export default function Home() {
     <Blog/> */}
     {/* <FeaturesSectionDemo/> */}
    
-      <UserPage/>
+      <UserPage mode="showcase" />
       {/* <FQR/> */}
   
    

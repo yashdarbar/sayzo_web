@@ -22,7 +22,7 @@ const JobCard = ({ job }) => {
 
       {/* Tags */}
       <div className="flex flex-wrap gap-2 mb-4">
-        {job.tags.map((tag) => (
+        {(job.tags || []).map((tag) => (
           <span
             key={tag}
             className="text-xs px-2 font-medium py-0.5 rounded-[6px] bg-gray-100 text-gray-800"

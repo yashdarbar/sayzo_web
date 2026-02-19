@@ -1,14 +1,34 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, CheckCircle, User, ArrowUpRight } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
+import ApplicationModal from "../ApplicationModal";
+import TaskDoerAuthModal from "../TaskDoerAuthModal";
 import WaitlistModal from "../JoinWaitList/WaitlistModal";
 
-const JobBottomSheet = ({ job, onClose }) => {
+const JobBottomSheet = ({ job, onClose, currentUser, hasApplied, isOwnTask, onApplicationSuccess, mode = "live" }) => {
   const [showSkills, setShowSkills] = useState(false);
   const [showClient, setShowClient] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false);
+
+  const handleApplyClick = () => {
+    if (mode === "showcase") {
+      setShowWaitlistModal(true);
+    } else if (!currentUser) {
+      setShowAuthModal(true);
+    } else {
+      setIsModalOpen(true);
+    }
+  };
+
+  const handleAuthSuccess = () => {
+    setShowAuthModal(false);
+    setIsModalOpen(true);
+  };
 
   /* 🔒 Lock background scroll */
   useEffect(() => {
@@ -58,6 +78,14 @@ const JobBottomSheet = ({ job, onClose }) => {
           <h2 className="text-xl font-medium">
             {job.title}
           </h2>
+
+          {/* YOUR TASK BADGE */}
+          {isOwnTask && (
+            <div className="flex items-center gap-1.5 mt-2 px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-full w-fit">
+              <User size={14} className="text-blue-600" />
+              <span className="text-xs font-medium text-blue-700">Your Task</span>
+            </div>
+          )}
 
           {/* COMPANY */}
           <div className="flex items-center gap-2 mt-3">
@@ -153,18 +181,62 @@ const JobBottomSheet = ({ job, onClose }) => {
 
         {/* FIXED CTA (INSIDE SHEET) */}
         <div className="px-4 py-3 bg-white">
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="w-full bg-primary-btn text-white py-3 rounded-lg font-medium"
-          >
-            Join Waitlist
-          </button>
+          {isOwnTask ? (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center">
+              <p className="text-gray-600 text-sm font-medium">You created this task</p>
+            </div>
+          ) : hasApplied ? (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+              <div className="flex items-center justify-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-500" />
+                <span className="text-green-700 font-medium">Already Applied</span>
+              </div>
+              <Link
+                href="/track-tasks"
+                className="inline-flex items-center gap-1 text-sm text-green-600 mt-1 hover:text-green-700 hover:underline transition"
+              >
+                To check the status, go to Track Tasks
+                <ArrowUpRight className="w-4 h-4" />
+              </Link>
+            </div>
+          ) : (
+            <button
+              onClick={handleApplyClick}
+              className="w-full bg-primary-btn text-white py-3 rounded-lg font-medium"
+            >
+              {mode === "showcase" ? "Join Waitlist" : "Apply now"}
+            </button>
+          )}
         </div>
       </motion.div>
 
-      <WaitlistModal
+      <TaskDoerAuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={handleAuthSuccess}
+      />
+
+      <ApplicationModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        task={{
+          id: job.id,
+          giverId: job.giverId,
+          taskName: job.title,
+          amount: job.budget?.amount,
+          budgetType: job.budget?.type,
+          duration: job.duration
+        }}
+        onSuccess={() => {
+          setIsModalOpen(false);
+          onApplicationSuccess?.();
+        }}
+        currentUser={currentUser}
+      />
+
+      <WaitlistModal
+        isOpen={showWaitlistModal}
+        onClose={() => setShowWaitlistModal(false)}
       />
     </>
   );

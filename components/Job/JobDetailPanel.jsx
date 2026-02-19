@@ -1,12 +1,32 @@
 "use client";
 
 import Image from "next/image";
+import ApplicationModal from "../ApplicationModal";
+import TaskDoerAuthModal from "../TaskDoerAuthModal";
 import WaitlistModal from "../JoinWaitList/WaitlistModal";
 import { useState } from "react";
-import { X } from "lucide-react";
+import { X, CheckCircle, User, ArrowUpRight } from "lucide-react";
+import Link from "next/link";
 
-const JobDetailPanel = ({ job, onClose }) => {
+const JobDetailPanel = ({ job, onClose, currentUser, hasApplied, isOwnTask, onApplicationSuccess, mode = "live" }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false);
+
+  const handleApplyClick = () => {
+    if (mode === "showcase") {
+      setShowWaitlistModal(true);
+    } else if (!currentUser) {
+      setShowAuthModal(true);
+    } else {
+      setIsModalOpen(true);
+    }
+  };
+
+  const handleAuthSuccess = () => {
+    setShowAuthModal(false);
+    setIsModalOpen(true);
+  };
 
   if (!job) {
     return (
@@ -42,6 +62,14 @@ const JobDetailPanel = ({ job, onClose }) => {
       <h2 className="text-2xl font-medium leading-snug">
         {job.title}
       </h2>
+
+      {/* YOUR TASK LABEL */}
+      {isOwnTask && (
+        <div className="flex items-center gap-2 mt-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg w-fit">
+          <User size={16} className="text-blue-600" />
+          <span className="text-sm font-medium text-blue-700">Your Task</span>
+        </div>
+      )}
 
       {/* COMPANY */}
       <div className="flex items-center gap-2 mt-3">
@@ -136,17 +164,62 @@ const JobDetailPanel = ({ job, onClose }) => {
       </div>
 
       {/* CTA */}
-      <button
-        onClick={() => setIsModalOpen(true)}
-        className="mt-8 w-full bg-primary-btn text-white py-3 rounded-lg font-medium flex items-center justify-center gap-3 hover:opacity-95 transition"
-      >
-        Join Waitlist
-       
-      </button>
+      {isOwnTask ? (
+        <div className="mt-8 bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+          <User className="w-6 h-6 text-gray-500 mx-auto mb-2" />
+          <p className="text-gray-600 font-medium">You created this task</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Check your dashboard to view applications
+          </p>
+        </div>
+      ) : hasApplied ? (
+        <div className="mt-8 bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+          <CheckCircle className="w-6 h-6 text-green-500 mx-auto mb-2" />
+          <p className="text-green-700 font-medium">Already Applied</p>
+          <Link
+            href="/track-tasks"
+            className="inline-flex items-center gap-1 text-sm text-green-600 mt-1 hover:text-green-700 hover:underline transition"
+          >
+            To check the status, go to Track Tasks
+            <ArrowUpRight className="w-4 h-4" />
+          </Link>
+        </div>
+      ) : (
+        <button
+          onClick={handleApplyClick}
+          className="mt-8 w-full bg-primary-btn text-white py-3 rounded-lg font-medium flex items-center justify-center gap-3 hover:opacity-95 transition"
+        >
+          {mode === "showcase" ? "Join Waitlist" : "Apply now"}
+        </button>
+      )}
 
-      <WaitlistModal
+      <TaskDoerAuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={handleAuthSuccess}
+      />
+
+      <ApplicationModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        task={{
+          id: job.id,
+          giverId: job.giverId,
+          taskName: job.title,
+          amount: job.budget?.amount,
+          budgetType: job.budget?.type,
+          duration: job.duration
+        }}
+        onSuccess={() => {
+          setIsModalOpen(false);
+          onApplicationSuccess?.();
+        }}
+        currentUser={currentUser}
+      />
+
+      <WaitlistModal
+        isOpen={showWaitlistModal}
+        onClose={() => setShowWaitlistModal(false)}
       />
     </div>
   );

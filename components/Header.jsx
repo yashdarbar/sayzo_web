@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "./ui/button";
-import { ArrowUpRight, Menu, X } from "lucide-react";
+import { ArrowUpRight, Menu, X, User, LogOut, Mail, Phone } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/app/Context/AuthContext";
 
 import Maskgroup from "../public/assets/Maskgroup.svg";
 import Maskgroup2 from "../public/assets/Maskgroup2.svg";
@@ -32,11 +33,27 @@ const menuVariants = {
 
 const Header = () => {
   const pathname = usePathname();
-  const hideMegaMenu = pathname === "/use-cases";
+  const router = useRouter();
+  const hideMegaMenu = pathname === "/use-cases" || pathname === "/track-tasks" || pathname === "/live-tasks" || pathname.startsWith("/website-aaadminpanel");
 
   const [open, setOpen] = useState(false);
   const [isWaitlistOpen, setIsWaitlistOpen] = useState(false);
   const [isTaskOpen, setIsTaskOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // Use centralized auth context instead of local listener
+  const { user, userProfile, isAdmin, logout } = useAuth();
+
+  // Logout handler
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setIsProfileOpen(false);
+      router.push('/');
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
 
   return (
     <div>
@@ -49,6 +66,26 @@ const Header = () => {
 
           {/* DESKTOP NAV */}
           <nav className="hidden lg:flex items-center gap-6">
+            <Link href="/track-tasks">
+              <span className="text-sm font-medium flex items-center">
+                Track Tasks
+                <ArrowUpRight
+                  className="w-3 h-3 text-gray-400 -mt-2 -ml-0.5"
+                  strokeWidth={3.2}
+                />
+              </span>
+            </Link>
+
+            <Link href="/live-tasks">
+              <span className="text-sm font-medium flex items-center">
+                Live Tasks
+                <ArrowUpRight
+                  className="w-3 h-3 text-gray-400 -mt-2 -ml-0.5"
+                  strokeWidth={3.2}
+                />
+              </span>
+            </Link>
+
             <Link href="/use-cases">
               <span className="text-sm font-medium flex items-center">
                 Use Cases
@@ -74,16 +111,41 @@ const Header = () => {
             >
               Join Waitlist
             </Button>
+
+            {/* PROFILE ICON - Show when logged in or admin */}
+            {(user || isAdmin) && (
+              <button
+                onClick={() => setIsProfileOpen(true)}
+                className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors ${
+                  isAdmin ? "bg-green-100 hover:bg-green-200" : "bg-zinc-100 hover:bg-zinc-200"
+                }`}
+                aria-label="Open profile menu"
+              >
+                <User className={`w-5 h-5 ${isAdmin ? "text-green-700" : "text-zinc-700"}`} />
+              </button>
+            )}
           </nav>
 
           {/* MOBILE NAV */}
           <div className="lg:hidden flex items-center gap-2">
             <Button
-              onClick={() => setIsWaitlistOpen(true)}
+              onClick={() => setIsTaskOpen(true)}
               className="rounded-full px-4 py-2 text-sm"
             >
-              Join Waitlist
+              + Post Task
             </Button>
+            {/* PROFILE ICON - Show when logged in or admin */}
+            {(user || isAdmin) && (
+              <button
+                onClick={() => setIsProfileOpen(true)}
+                className={`flex items-center justify-center w-9 h-9 rounded-full transition-colors ${
+                  isAdmin ? "bg-green-100 hover:bg-green-200" : "bg-zinc-100 hover:bg-zinc-200"
+                }`}
+                aria-label="Open profile menu"
+              >
+                <User className={`w-4 h-4 ${isAdmin ? "text-green-700" : "text-zinc-700"}`} />
+              </button>
+            )}
             <button onClick={() => setOpen(true)}>
               <Menu />
             </button>
@@ -102,6 +164,97 @@ const Header = () => {
         isOpen={isWaitlistOpen}
         onClose={() => setIsWaitlistOpen(false)}
       />
+
+      {/* PROFILE MODAL */}
+      <AnimatePresence>
+        {isProfileOpen && (
+          <motion.div
+            className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsProfileOpen(false)}
+          >
+            <motion.div
+              className="w-full max-w-sm bg-black border border-zinc-800 rounded-2xl p-6"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-semibold text-white">Profile</h2>
+                  {isAdmin && (
+                    <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-medium rounded-full">
+                      Admin
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => setIsProfileOpen(false)}
+                  className="text-zinc-500 hover:text-white transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              {/* User Info */}
+              <div className="space-y-4">
+                {/* Profile Avatar & Name */}
+                <div className="flex flex-col items-center">
+                  <div className="w-20 h-20 rounded-full bg-zinc-800 flex items-center justify-center mb-3">
+                    <User className="w-10 h-10 text-zinc-400" />
+                  </div>
+                  {userProfile?.fullName && (
+                    <p className="text-white text-lg font-semibold">
+                      {userProfile.fullName}
+                    </p>
+                  )}
+                </div>
+
+                {/* Email */}
+                <div className="bg-zinc-900 rounded-xl p-4">
+                  <div className="flex items-center gap-3">
+                    <Mail className="w-5 h-5 text-zinc-500" />
+                    <div>
+                      <p className="text-zinc-500 text-xs">Email</p>
+                      <p className="text-white font-medium">
+                        {user?.email || userProfile?.email || "Not available"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Phone Number */}
+                {userProfile?.phone && (
+                  <div className="bg-zinc-900 rounded-xl p-4">
+                    <div className="flex items-center gap-3">
+                      <Phone className="w-5 h-5 text-zinc-500" />
+                      <div>
+                        <p className="text-zinc-500 text-xs">Phone</p>
+                        <p className="text-white font-medium">
+                          {userProfile.phone}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Logout Button */}
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 py-4 rounded-xl font-semibold transition-colors"
+                >
+                  <LogOut className="w-5 h-5" />
+                  Logout
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* MOBILE DROPDOWN */}
       <AnimatePresence>
@@ -127,16 +280,40 @@ const Header = () => {
                 Home
               </Link>
 
-              {/* POST TASK (MOBILE) */}
+              {/* JOIN WAITLIST (MOBILE) */}
               <button
                 onClick={() => {
                   setOpen(false);
-                  setIsTaskOpen(true);
+                  setIsWaitlistOpen(true);
                 }}
                 className="bg-primary-btn w-full rounded-xl py-2.5 text-white"
               >
-                Post Task
+                Join Waitlist
               </button>
+
+              <Link
+                onClick={() => setOpen(false)}
+                href="/track-tasks"
+                className="flex text-left w-full items-center justify-start gap-2 w-full rounded-xl py-2.5"
+              >
+                Track Tasks
+                <ArrowUpRight
+                  className="w-3 h-3 text-gray-400 -mt-2"
+                  strokeWidth={3.2}
+                />
+              </Link>
+
+              <Link
+                onClick={() => setOpen(false)}
+                href="/live-tasks"
+                className="flex text-left w-full items-center justify-start gap-2 w-full rounded-xl py-2.5"
+              >
+                Live Tasks
+                <ArrowUpRight
+                  className="w-3 h-3 text-gray-400 -mt-2"
+                  strokeWidth={3.2}
+                />
+              </Link>
 
               <Link
                 onClick={() => setOpen(false)}

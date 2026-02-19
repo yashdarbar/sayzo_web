@@ -1,10 +1,14 @@
 import { Inter,Instrument_Serif } from "next/font/google";
+import { Toaster } from "react-hot-toast";
 
 import "./globals.css";
 import Footer from "@/components/Footer";
 import HeaderWrapper from "@/components/HeaderWrapper";
 import { PolicyProvider } from "@/app/Context/PolicyContext";
+import { AuthProvider } from "@/app/Context/AuthContext";
 import AllLinks from "@/components/AllLinks";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import MagicLinkHandler from "@/components/MagicLinkHandler";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -67,21 +71,28 @@ export default function RootLayout({ children }) {
     <html lang="en"  className={`${inter.variable} ${instrumentSerif.variable}`}>
       
       <PolicyProvider>
+      <AuthProvider>
       <body>
+        <Toaster position="top-right" />
         {/* FULL WIDTH */}
         <HeaderWrapper />
 
         {/* CENTERED APP CONTENT */}
         <div >
-       
+
           <main>
-            {children}
+            <ErrorBoundary>
+              <MagicLinkHandler>
+                {children}
+              </MagicLinkHandler>
+            </ErrorBoundary>
           </main>
-        
+
         </div>
         <AllLinks/>
         <Footer/>
       </body>
+      </AuthProvider>
       </PolicyProvider>
     </html>
   );
