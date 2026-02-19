@@ -1,35 +1,39 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AdminAuthModal from "@/components/admin/AdminAuthModal";
-import { auth } from "@/lib/firebase";
-import { isAdminPhone } from "@/lib/adminConfig";
 import { Loader2 } from "lucide-react";
+import { useAuth } from "@/app/Context/AuthContext";
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [checking, setChecking] = useState(true);
+
+  // Use centralized auth context instead of own listener
+  const { user, isAdmin, isLoading } = useAuth();
 
   useEffect(() => {
     // Check if already logged in as admin
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user && isAdminPhone(user.phoneNumber)) {
-        // Already logged in as admin, redirect to dashboard
-        router.push("/admin/dashboard");
-      } else {
-        setChecking(false);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [router]);
+    if (!isLoading && user && isAdmin) {
+      router.push("/admin/dashboard");
+    }
+  }, [user, isAdmin, isLoading, router]);
 
   const handleAuthSuccess = (user) => {
     router.push("/admin/dashboard");
   };
 
-  if (checking) {
+  // Show loading while checking auth state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center pt-32">
+        <Loader2 className="w-8 h-8 text-white animate-spin" />
+      </div>
+    );
+  }
+
+  // If already admin, will redirect via useEffect - show loading briefly
+  if (user && isAdmin) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center pt-32">
         <Loader2 className="w-8 h-8 text-white animate-spin" />

@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import toast from "react-hot-toast";
 import {
   Loader2,
-  LogOut,
   CheckCircle,
   XCircle,
   X,
@@ -15,11 +15,12 @@ import {
   Phone,
   Calendar,
   Trash2,
-  ChevronDown
+  ChevronDown,
+  Pencil
 } from "lucide-react";
-import { auth, getPendingTasks, getTasksByStatus, updateTaskStatus, deleteTask } from "@/lib/firebase";
-import { isAdminPhone } from "@/lib/adminConfig";
+import { getPendingTasks, getTasksByStatus, updateTaskStatus, updateTask, deleteTask } from "@/lib/firebase";
 import { TASK_STATUS } from "@/lib/constants";
+import { useAuth } from "@/app/Context/AuthContext";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -32,19 +33,43 @@ export default function AdminDashboard() {
   const [rejectReason, setRejectReason] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [editForm, setEditForm] = useState({
+    taskType: "online",
+    taskName: "",
+    customerName: "",
+    phone: "",
+    location: "",
+    description: "",
+    budgetType: "fixed",
+    amount: "",
+    duration: "",
+    skills: "",
+    experience: "",
+  });
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [error, setError] = useState("");
 
-  // Check admin auth on mount
+  // Use centralized auth context instead of own listener
+  const { user, isAdmin, isLoading: authLoading } = useAuth();
+
+  // Check admin auth on mount and redirect if not admin
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (!user || !isAdminPhone(user.phoneNumber)) {
-        router.push("/admin");
-      } else {
-        fetchTasks();
-      }
-    });
+    if (authLoading) return;
 
-    return () => unsubscribe();
-  }, [router]);
+    if (!user || !isAdmin) {
+      // Not authenticated or not admin - redirect
+      setSelectedTask(null);
+      setShowRejectModal(false);
+      setShowEditModal(false);
+      router.push("/admin");
+    } else {
+      // Admin authenticated - fetch tasks
+      fetchTasks();
+    }
+  }, [user, isAdmin, authLoading, router]);
 
   // Handle screen resize
   useEffect(() => {
@@ -56,13 +81,14 @@ export default function AdminDashboard() {
 
   // Fetch tasks when filter changes
   useEffect(() => {
-    if (auth.currentUser) {
+    if (user && isAdmin) {
       fetchTasks();
     }
-  }, [statusFilter]);
+  }, [statusFilter, user, isAdmin]);
 
   const fetchTasks = async () => {
     setLoading(true);
+    setError("");
     try {
       let data;
       if (statusFilter === "pending") {
@@ -78,6 +104,7 @@ export default function AdminDashboard() {
       setTasks(data);
     } catch (err) {
       console.error("Error fetching tasks:", err);
+      setError(err.message || "Failed to load tasks. Please refresh the page.");
     } finally {
       setLoading(false);
     }
@@ -85,12 +112,15 @@ export default function AdminDashboard() {
 
   const handleApprove = async (taskId) => {
     setActionLoading(taskId);
+    setError("");
     try {
       await updateTaskStatus(taskId, TASK_STATUS.APPROVED);
       await fetchTasks();
       setSelectedTask(null);
+      toast.success("Task approved successfully!");
     } catch (err) {
       console.error("Error approving task:", err);
+      setError(err.message || "Failed to approve task. Please try again.");
     } finally {
       setActionLoading(null);
     }
@@ -100,14 +130,17 @@ export default function AdminDashboard() {
     if (!rejectReason.trim() || !selectedTask) return;
 
     setActionLoading(selectedTask.id);
+    setError("");
     try {
       await updateTaskStatus(selectedTask.id, TASK_STATUS.REJECTED, rejectReason);
       setShowRejectModal(false);
       setRejectReason("");
       await fetchTasks();
       setSelectedTask(null);
+      toast.success("Task rejected");
     } catch (err) {
       console.error("Error rejecting task:", err);
+      setError(err.message || "Failed to reject task. Please try again.");
     } finally {
       setActionLoading(null);
     }
@@ -118,20 +151,112 @@ export default function AdminDashboard() {
       return;
     }
     setActionLoading(taskId);
+    setError("");
     try {
       await deleteTask(taskId);
       await fetchTasks();
       setSelectedTask(null);
     } catch (err) {
       console.error("Error deleting task:", err);
+      setError(err.message || "Failed to delete task. Please try again.");
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleLogout = async () => {
-    await auth.signOut();
-    router.push("/admin");
+  const handleEditClick = (task) => {
+    setEditingTask(task);
+    setEditForm({
+      taskType: task.taskType || "online",
+      taskName: task.taskName || "",
+      customerName: task.customerName || "",
+      phone: task.phone || "",
+      location: task.location || "",
+      description: task.description || "",
+      budgetType: task.budgetType || "fixed",
+      amount: task.amount || "",
+      duration: task.duration || "",
+      skills: task.skills || "",
+      experience: task.experience || "",
+    });
+    setEditError("");
+    setShowEditModal(true);
+  };
+
+  const handleEditFormChange = (e) => {
+    const { name, value } = e.target;
+    setEditForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSaveEdit = async () => {
+    // Validation
+    if (!editForm.taskName.trim()) {
+      setEditError("Task name is required");
+      return;
+    }
+    if (!editForm.customerName.trim()) {
+      setEditError("Customer name is required");
+      return;
+    }
+    if (!editForm.phone.trim()) {
+      setEditError("Phone number is required");
+      return;
+    }
+    if (editForm.taskType === "offline" && !editForm.location.trim()) {
+      setEditError("Location is required for offline tasks");
+      return;
+    }
+    if (!editForm.description.trim()) {
+      setEditError("Description is required");
+      return;
+    }
+    if (!editForm.amount.trim()) {
+      setEditError("Amount is required");
+      return;
+    }
+    if (!editForm.duration.trim()) {
+      setEditError("Duration is required");
+      return;
+    }
+    if (!editForm.skills.trim()) {
+      setEditError("Skills are required");
+      return;
+    }
+    if (!editForm.experience) {
+      setEditError("Experience level is required");
+      return;
+    }
+
+    setEditError("");
+    setEditLoading(true);
+
+    try {
+      await updateTask(editingTask.id, {
+        taskType: editForm.taskType,
+        taskName: editForm.taskName,
+        customerName: editForm.customerName,
+        phone: editForm.phone,
+        location: editForm.taskType === "offline" ? editForm.location : "Online",
+        description: editForm.description,
+        budgetType: editForm.budgetType,
+        amount: editForm.amount,
+        duration: editForm.duration,
+        skills: editForm.skills,
+        experience: editForm.experience,
+      });
+      setShowEditModal(false);
+      setEditingTask(null);
+      await fetchTasks();
+      // Update selected task if it was the one being edited
+      if (selectedTask?.id === editingTask.id) {
+        setSelectedTask(null);
+      }
+    } catch (err) {
+      console.error("Error updating task:", err);
+      setEditError("Failed to update task. Please try again.");
+    } finally {
+      setEditLoading(false);
+    }
   };
 
   const formatDate = (timestamp) => {
@@ -239,13 +364,21 @@ export default function AdminDashboard() {
 
     return (
       <div className="relative bg-white rounded-xl shadow-2xl p-8 sticky top-6">
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-black transition"
-        >
-          <X size={18} />
-        </button>
+        {/* Top Action Buttons */}
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          <button
+            onClick={() => handleEditClick(task)}
+            className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-black transition"
+          >
+            <Pencil size={18} />
+          </button>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-black transition"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
         {/* Status Badge */}
         <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium mb-4 ${getStatusBadge(task.status)}`}>
@@ -414,11 +547,25 @@ export default function AdminDashboard() {
           animate={{ y: 0 }}
           exit={{ y: "100%" }}
           transition={{ type: "spring", stiffness: 260, damping: 30 }}
-          className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl z-50 max-h-[85vh] overflow-y-auto"
+          className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl z-50 max-h-[85vh] overflow-y-auto scrollbar-hide"
         >
-          {/* Handle */}
+          {/* Handle & Top Actions */}
           <div className="sticky top-0 bg-white pt-3 pb-2 px-6">
-            <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto" />
+            <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-3" />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => handleEditClick(task)}
+                className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-black transition"
+              >
+                <Pencil size={18} />
+              </button>
+              <button
+                onClick={onClose}
+                className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-black transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
           </div>
 
           <div className="px-6 pb-8">
@@ -580,20 +727,26 @@ export default function AdminDashboard() {
               )}
             </div>
 
-            {/* Logout */}
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 text-gray-500 hover:text-gray-700 transition"
-            >
-              <LogOut className="w-5 h-5" />
-              <span className="hidden sm:inline">Logout</span>
-            </button>
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="max-w-350 mx-auto px-4 py-8">
+      <div className="px-6 py-8">
+        <div className="max-w-350 mx-auto">
+        {/* Error Banner */}
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between">
+            <p className="text-red-700 text-sm">{error}</p>
+            <button
+              onClick={() => setError("")}
+              className="text-red-500 hover:text-red-700"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
@@ -625,7 +778,7 @@ export default function AdminDashboard() {
                 ) : (
                   // Split View (with selection)
                   <div className="grid grid-cols-[1.2fr_1fr] gap-6">
-                    <div className="space-y-4 overflow-y-auto max-h-[80vh] pr-2">
+                    <div className="space-y-4 overflow-y-auto max-h-[80vh] pr-2 scrollbar-hide">
                       {tasks.map((task) => (
                         <TaskCard
                           key={task.id}
@@ -666,6 +819,7 @@ export default function AdminDashboard() {
             )}
           </>
         )}
+        </div>
       </div>
 
       {/* Reject Modal */}
@@ -705,6 +859,161 @@ export default function AdminDashboard() {
                   "Reject Task"
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Task Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[999]">
+          <div className="w-full max-w-md bg-black border border-zinc-800 rounded-2xl">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-zinc-800">
+              <h2 className="text-xl text-white font-semibold">Edit Task</h2>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingTask(null);
+                  setEditError("");
+                }}
+              >
+                <X className="text-zinc-400 hover:text-white" />
+              </button>
+            </div>
+
+            <div className="max-h-[75vh] overflow-y-auto px-6 py-4 scrollbar-hide">
+              {/* Task Type Toggle */}
+              <div className="flex gap-2 mb-4">
+                {["online", "offline"].map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setEditForm((prev) => ({ ...prev, taskType: type }))}
+                    className={`flex-1 py-3 rounded-xl font-semibold ${
+                      editForm.taskType === type
+                        ? "bg-white text-black"
+                        : "bg-zinc-900 text-white"
+                    }`}
+                  >
+                    {type === "online" ? "Online Task" : "Offline Task"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Form Fields */}
+              <input
+                className="w-full bg-[#18181B] text-white placeholder:text-zinc-500 px-4 py-4 my-2 rounded-xl border border-zinc-800 focus:outline-none focus:border-zinc-600"
+                placeholder="Customer Name *"
+                name="customerName"
+                value={editForm.customerName}
+                onChange={handleEditFormChange}
+              />
+              <input
+                className="w-full bg-[#18181B] text-white placeholder:text-zinc-500 px-4 py-4 my-2 rounded-xl border border-zinc-800 focus:outline-none focus:border-zinc-600"
+                placeholder="Task Name *"
+                name="taskName"
+                value={editForm.taskName}
+                onChange={handleEditFormChange}
+              />
+              <input
+                className="w-full bg-[#18181B] text-white placeholder:text-zinc-500 px-4 py-4 my-2 rounded-xl border border-zinc-800 focus:outline-none focus:border-zinc-600"
+                placeholder="Phone Number *"
+                name="phone"
+                value={editForm.phone}
+                onChange={handleEditFormChange}
+              />
+
+              {editForm.taskType === "offline" && (
+                <input
+                  className="w-full bg-[#18181B] text-white placeholder:text-zinc-500 px-4 py-4 my-2 rounded-xl border border-zinc-800 focus:outline-none focus:border-zinc-600"
+                  placeholder="Location *"
+                  name="location"
+                  value={editForm.location}
+                  onChange={handleEditFormChange}
+                />
+              )}
+
+              <textarea
+                className="w-full bg-[#18181B] text-white placeholder:text-zinc-500 px-4 py-4 my-2 rounded-xl border border-zinc-800 focus:outline-none focus:border-zinc-600 h-32"
+                placeholder="Description *"
+                name="description"
+                value={editForm.description}
+                onChange={handleEditFormChange}
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  name="budgetType"
+                  className="w-full bg-[#18181B] text-white placeholder:text-zinc-500 px-4 py-4 my-2 rounded-xl border border-zinc-800 focus:outline-none focus:border-zinc-600"
+                  value={editForm.budgetType}
+                  onChange={handleEditFormChange}
+                >
+                  <option value="fixed">Fixed Price</option>
+                  <option value="negotiable">Negotiable</option>
+                </select>
+                <input
+                  className="w-full bg-[#18181B] text-white placeholder:text-zinc-500 px-4 py-4 my-2 rounded-xl border border-zinc-800 focus:outline-none focus:border-zinc-600"
+                  placeholder="Amount *"
+                  name="amount"
+                  value={editForm.amount}
+                  onChange={handleEditFormChange}
+                />
+              </div>
+
+              <input
+                className="w-full bg-[#18181B] text-white placeholder:text-zinc-500 px-4 py-4 my-2 rounded-xl border border-zinc-800 focus:outline-none focus:border-zinc-600"
+                placeholder="Duration *"
+                name="duration"
+                value={editForm.duration}
+                onChange={handleEditFormChange}
+              />
+              <input
+                className="w-full bg-[#18181B] text-white placeholder:text-zinc-500 px-4 py-4 my-2 rounded-xl border border-zinc-800 focus:outline-none focus:border-zinc-600"
+                placeholder="Skills (comma separated) *"
+                name="skills"
+                value={editForm.skills}
+                onChange={handleEditFormChange}
+              />
+
+              <select
+                name="experience"
+                className="w-full bg-[#18181B] text-white placeholder:text-zinc-500 px-4 py-4 my-2 rounded-xl border border-zinc-800 focus:outline-none focus:border-zinc-600"
+                value={editForm.experience}
+                onChange={handleEditFormChange}
+              >
+                <option value="">Select Experience *</option>
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="expert">Expert</option>
+              </select>
+
+              {editError && <p className="text-red-400 text-sm mt-2">{editError}</p>}
+
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingTask(null);
+                    setEditError("");
+                  }}
+                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white py-4 rounded-full font-semibold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={editLoading}
+                  onClick={handleSaveEdit}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2 transition"
+                >
+                  {editLoading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

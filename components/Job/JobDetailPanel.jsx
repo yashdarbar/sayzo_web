@@ -3,15 +3,20 @@
 import Image from "next/image";
 import ApplicationModal from "../ApplicationModal";
 import TaskDoerAuthModal from "../TaskDoerAuthModal";
+import WaitlistModal from "../JoinWaitList/WaitlistModal";
 import { useState } from "react";
-import { X, CheckCircle, User } from "lucide-react";
+import { X, CheckCircle, User, ArrowUpRight } from "lucide-react";
+import Link from "next/link";
 
-const JobDetailPanel = ({ job, onClose, currentUser, hasApplied, isOwnTask, onApplicationSuccess }) => {
+const JobDetailPanel = ({ job, onClose, currentUser, hasApplied, isOwnTask, onApplicationSuccess, mode = "live" }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false);
 
   const handleApplyClick = () => {
-    if (!currentUser) {
+    if (mode === "showcase") {
+      setShowWaitlistModal(true);
+    } else if (!currentUser) {
       setShowAuthModal(true);
     } else {
       setIsModalOpen(true);
@@ -171,16 +176,20 @@ const JobDetailPanel = ({ job, onClose, currentUser, hasApplied, isOwnTask, onAp
         <div className="mt-8 bg-green-50 border border-green-200 rounded-lg p-4 text-center">
           <CheckCircle className="w-6 h-6 text-green-500 mx-auto mb-2" />
           <p className="text-green-700 font-medium">Already Applied</p>
-          <p className="text-sm text-green-600 mt-1">
-            Your application is being reviewed
-          </p>
+          <Link
+            href="/track-tasks"
+            className="inline-flex items-center gap-1 text-sm text-green-600 mt-1 hover:text-green-700 hover:underline transition"
+          >
+            To check the status, go to Track Tasks
+            <ArrowUpRight className="w-4 h-4" />
+          </Link>
         </div>
       ) : (
         <button
           onClick={handleApplyClick}
           className="mt-8 w-full bg-primary-btn text-white py-3 rounded-lg font-medium flex items-center justify-center gap-3 hover:opacity-95 transition"
         >
-          Apply now
+          {mode === "showcase" ? "Join Waitlist" : "Apply now"}
         </button>
       )}
 
@@ -205,6 +214,12 @@ const JobDetailPanel = ({ job, onClose, currentUser, hasApplied, isOwnTask, onAp
           setIsModalOpen(false);
           onApplicationSuccess?.();
         }}
+        currentUser={currentUser}
+      />
+
+      <WaitlistModal
+        isOpen={showWaitlistModal}
+        onClose={() => setShowWaitlistModal(false)}
       />
     </div>
   );

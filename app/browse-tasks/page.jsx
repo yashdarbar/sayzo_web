@@ -10,9 +10,10 @@ import {
   Briefcase,
   Search,
 } from "lucide-react";
-import { auth, getApprovedTasks } from "@/lib/firebase";
+import { getApprovedTasks } from "@/lib/firebase";
 import TaskDoerAuthModal from "@/components/TaskDoerAuthModal";
 import ApplicationModal from "@/components/ApplicationModal";
+import { useAuth } from "@/app/Context/AuthContext";
 
 export default function BrowseTasksPage() {
   const [loading, setLoading] = useState(true);
@@ -21,19 +22,22 @@ export default function BrowseTasksPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Auth & Application state
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Use centralized auth context
+  const { isAuthenticated, user } = useAuth();
+
+  // Application state
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showApplicationModal, setShowApplicationModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
+  const [error, setError] = useState("");
 
-  // Check auth state
+  // Clear selection when user logs out
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      setIsAuthenticated(!!user);
-    });
-    return () => unsubscribe();
-  }, []);
+    if (!isAuthenticated) {
+      setSelectedTask(null);
+      setShowApplicationModal(false);
+    }
+  }, [isAuthenticated]);
 
   // Fetch approved tasks
   useEffect(() => {
@@ -65,12 +69,14 @@ export default function BrowseTasksPage() {
 
   const fetchTasks = async () => {
     setLoading(true);
+    setError("");
     try {
       const approvedTasks = await getApprovedTasks();
       setTasks(approvedTasks);
       setFilteredTasks(approvedTasks);
     } catch (err) {
       console.error("Error fetching tasks:", err);
+      setError(err.message || "Failed to load tasks. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -86,9 +92,8 @@ export default function BrowseTasksPage() {
   };
 
   const handleAuthSuccess = () => {
-    setIsAuthenticated(true);
     setShowAuthModal(false);
-    // Open application modal after successful auth
+    // Auth context will update automatically, open application modal
     setShowApplicationModal(true);
   };
 
@@ -122,6 +127,7 @@ export default function BrowseTasksPage() {
           setShowApplicationModal(false);
           setSelectedTask(null);
         }}
+        currentUser={user}
       />
 
       {/* Header */}
@@ -178,6 +184,16 @@ export default function BrowseTasksPage() {
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+          </div>
+        ) : error ? (
+          <div className="text-center py-20">
+            <p className="text-red-500 text-lg">{error}</p>
+            <button
+              onClick={fetchTasks}
+              className="mt-4 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800"
+            >
+              Try Again
+            </button>
           </div>
         ) : filteredTasks.length === 0 ? (
           <div className="text-center py-20">

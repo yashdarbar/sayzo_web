@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "./ui/button";
-import { ArrowUpRight, Menu, X, User, LogOut } from "lucide-react";
+import { ArrowUpRight, Menu, X, User, LogOut, Mail, Phone } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { auth } from "@/lib/firebase";
+import { useAuth } from "@/app/Context/AuthContext";
 
 import Maskgroup from "../public/assets/Maskgroup.svg";
 import Maskgroup2 from "../public/assets/Maskgroup2.svg";
@@ -33,27 +33,23 @@ const menuVariants = {
 
 const Header = () => {
   const pathname = usePathname();
+  const router = useRouter();
   const hideMegaMenu = pathname === "/use-cases" || pathname === "/track-tasks" || pathname === "/live-tasks" || pathname.startsWith("/admin");
 
   const [open, setOpen] = useState(false);
   const [isWaitlistOpen, setIsWaitlistOpen] = useState(false);
   const [isTaskOpen, setIsTaskOpen] = useState(false);
-  const [user, setUser] = useState(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-  // Listen for auth state changes
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-      setUser(currentUser);
-    });
-    return () => unsubscribe();
-  }, []);
+  // Use centralized auth context instead of local listener
+  const { user, userProfile, isAdmin, logout } = useAuth();
 
   // Logout handler
   const handleLogout = async () => {
     try {
-      await auth.signOut();
+      await logout();
       setIsProfileOpen(false);
+      router.push('/');
     } catch (error) {
       console.error("Logout error:", error);
     }
@@ -116,14 +112,16 @@ const Header = () => {
               Join Waitlist
             </Button>
 
-            {/* PROFILE ICON - Only show when logged in */}
-            {user && (
+            {/* PROFILE ICON - Show when logged in or admin */}
+            {(user || isAdmin) && (
               <button
                 onClick={() => setIsProfileOpen(true)}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-zinc-100 hover:bg-zinc-200 transition-colors"
+                className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors ${
+                  isAdmin ? "bg-green-100 hover:bg-green-200" : "bg-zinc-100 hover:bg-zinc-200"
+                }`}
                 aria-label="Open profile menu"
               >
-                <User className="w-5 h-5 text-zinc-700" />
+                <User className={`w-5 h-5 ${isAdmin ? "text-green-700" : "text-zinc-700"}`} />
               </button>
             )}
           </nav>
@@ -131,19 +129,21 @@ const Header = () => {
           {/* MOBILE NAV */}
           <div className="lg:hidden flex items-center gap-2">
             <Button
-              onClick={() => setIsWaitlistOpen(true)}
+              onClick={() => setIsTaskOpen(true)}
               className="rounded-full px-4 py-2 text-sm"
             >
-              Join Waitlist
+              + Post Task
             </Button>
-            {/* PROFILE ICON - Only show when logged in */}
-            {user && (
+            {/* PROFILE ICON - Show when logged in or admin */}
+            {(user || isAdmin) && (
               <button
                 onClick={() => setIsProfileOpen(true)}
-                className="flex items-center justify-center w-9 h-9 rounded-full bg-zinc-100 hover:bg-zinc-200 transition-colors"
+                className={`flex items-center justify-center w-9 h-9 rounded-full transition-colors ${
+                  isAdmin ? "bg-green-100 hover:bg-green-200" : "bg-zinc-100 hover:bg-zinc-200"
+                }`}
                 aria-label="Open profile menu"
               >
-                <User className="w-4 h-4 text-zinc-700" />
+                <User className={`w-4 h-4 ${isAdmin ? "text-green-700" : "text-zinc-700"}`} />
               </button>
             )}
             <button onClick={() => setOpen(true)}>
@@ -184,7 +184,14 @@ const Header = () => {
             >
               {/* Header */}
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-white">Profile</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-semibold text-white">Profile</h2>
+                  {isAdmin && (
+                    <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-medium rounded-full">
+                      Admin
+                    </span>
+                  )}
+                </div>
                 <button
                   onClick={() => setIsProfileOpen(false)}
                   className="text-zinc-500 hover:text-white transition-colors"
@@ -195,20 +202,45 @@ const Header = () => {
 
               {/* User Info */}
               <div className="space-y-4">
-                {/* Profile Avatar */}
-                <div className="flex justify-center">
-                  <div className="w-20 h-20 rounded-full bg-zinc-800 flex items-center justify-center">
+                {/* Profile Avatar & Name */}
+                <div className="flex flex-col items-center">
+                  <div className="w-20 h-20 rounded-full bg-zinc-800 flex items-center justify-center mb-3">
                     <User className="w-10 h-10 text-zinc-400" />
+                  </div>
+                  {userProfile?.fullName && (
+                    <p className="text-white text-lg font-semibold">
+                      {userProfile.fullName}
+                    </p>
+                  )}
+                </div>
+
+                {/* Email */}
+                <div className="bg-zinc-900 rounded-xl p-4">
+                  <div className="flex items-center gap-3">
+                    <Mail className="w-5 h-5 text-zinc-500" />
+                    <div>
+                      <p className="text-zinc-500 text-xs">Email</p>
+                      <p className="text-white font-medium">
+                        {user?.email || userProfile?.email || "Not available"}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
                 {/* Phone Number */}
-                <div className="bg-zinc-900 rounded-xl p-4 text-center">
-                  <p className="text-zinc-500 text-sm mb-1">Phone Number</p>
-                  <p className="text-white text-lg font-medium">
-                    {user?.phoneNumber || "Not available"}
-                  </p>
-                </div>
+                {userProfile?.phone && (
+                  <div className="bg-zinc-900 rounded-xl p-4">
+                    <div className="flex items-center gap-3">
+                      <Phone className="w-5 h-5 text-zinc-500" />
+                      <div>
+                        <p className="text-zinc-500 text-xs">Phone</p>
+                        <p className="text-white font-medium">
+                          {userProfile.phone}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Logout Button */}
                 <button
@@ -248,15 +280,15 @@ const Header = () => {
                 Home
               </Link>
 
-              {/* POST TASK (MOBILE) */}
+              {/* JOIN WAITLIST (MOBILE) */}
               <button
                 onClick={() => {
                   setOpen(false);
-                  setIsTaskOpen(true);
+                  setIsWaitlistOpen(true);
                 }}
                 className="bg-primary-btn w-full rounded-xl py-2.5 text-white"
               >
-                Post Task
+                Join Waitlist
               </button>
 
               <Link

@@ -1,13 +1,49 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { X, Loader2, CheckCircle } from "lucide-react";
+import { X, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { addApplication, auth } from "@/lib/firebase";
+import { addApplication, getUserProfile, hasUserApplied } from "@/lib/firebase";
 
-const ApplicationModal = ({ isOpen, onClose, task, onSuccess }) => {
+// Error boundary for modal
+class ModalErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("ApplicationModal Error:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6 text-center">
+          <p className="text-red-400 mb-4">Something went wrong.</p>
+          <button
+            onClick={() => {
+              this.setState({ hasError: false });
+              this.props.onClose?.();
+            }}
+            className="text-white underline"
+          >
+            Close and try again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const ApplicationModal = ({ isOpen, onClose, task, onSuccess, currentUser }) => {
   const [loading, setLoading] = useState(false);
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
+  const [alreadyApplied, setAlreadyApplied] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -26,6 +62,62 @@ const ApplicationModal = ({ isOpen, onClose, task, onSuccess }) => {
     email: "",
     city: "",
   });
+
+  // Check for duplicate application and pre-fill form when modal opens
+  useEffect(() => {
+    if (!isOpen || !currentUser || !task?.id) return;
+
+    let isMounted = true;
+    setCheckingDuplicate(true);
+    setAlreadyApplied(false);
+    setError("");
+
+    const initializeModal = async () => {
+      try {
+        // Check if user already applied
+        const applied = await hasUserApplied(task.id, currentUser.uid);
+        if (!isMounted) return;
+
+        if (applied) {
+          setAlreadyApplied(true);
+          setCheckingDuplicate(false);
+          return;
+        }
+
+        // Pre-fill form from user profile
+        try {
+          const profile = await getUserProfile(currentUser.uid);
+          if (!isMounted) return;
+
+          if (profile) {
+            setForm((prev) => ({
+              ...prev,
+              applicantName: profile.fullName || prev.applicantName,
+              email: currentUser?.email || profile.email || prev.email,
+            }));
+          }
+        } catch (profileErr) {
+          console.error("Error fetching profile:", profileErr);
+          // Continue without pre-fill if profile fetch fails
+        }
+      } catch (err) {
+        console.error("Error checking application status:", err);
+        if (isMounted) {
+          setError("Failed to check application status. Please try again.");
+        }
+      } finally {
+        if (isMounted) {
+          setCheckingDuplicate(false);
+        }
+      }
+    };
+
+    initializeModal();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, task?.id, currentUser]);
 
   const input =
     "w-full bg-[#18181B] text-white placeholder:text-zinc-500 px-4 py-4 my-2 rounded-xl border border-zinc-800 focus:outline-none focus:border-zinc-600";
@@ -46,7 +138,7 @@ const ApplicationModal = ({ isOpen, onClose, task, onSuccess }) => {
     return "";
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     const validationError = validate();
     if (validationError) {
       setError(validationError);
@@ -54,7 +146,7 @@ const ApplicationModal = ({ isOpen, onClose, task, onSuccess }) => {
     }
 
     // Safety check: Prevent self-application
-    if (task?.giverId === auth.currentUser?.uid) {
+    if (task?.giverId === currentUser?.uid) {
       setError("You cannot apply to your own task");
       return;
     }
@@ -63,6 +155,14 @@ const ApplicationModal = ({ isOpen, onClose, task, onSuccess }) => {
     setLoading(true);
 
     try {
+      // Double-check for duplicate before submitting
+      const alreadyExists = await hasUserApplied(task.id, currentUser.uid);
+      if (alreadyExists) {
+        setAlreadyApplied(true);
+        setLoading(false);
+        return;
+      }
+
       await addApplication({
         taskId: task.id,
         ...form,
@@ -74,11 +174,16 @@ const ApplicationModal = ({ isOpen, onClose, task, onSuccess }) => {
       }, 2000);
     } catch (err) {
       console.error("Application Error:", err);
-      setError("Failed to submit application. Please try again.");
+      // Map specific error codes to user-friendly messages
+      if (err.message?.includes("duplicate") || err.message?.includes("already applied")) {
+        setAlreadyApplied(true);
+      } else {
+        setError("Failed to submit application. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [form, task, onClose, onSuccess]);
 
   const resetAndClose = () => {
     setError("");
@@ -99,31 +204,54 @@ const ApplicationModal = ({ isOpen, onClose, task, onSuccess }) => {
   if (!mounted) return null;
 
   return createPortal(
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[1001] bg-black/80 backdrop-blur flex items-center justify-center p-4"
-        >
+    <ModalErrorBoundary onClose={onClose}>
+      <AnimatePresence>
+        {isOpen && (
           <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            className="w-full max-w-md bg-black border border-zinc-800 rounded-2xl"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[1001] bg-black/80 backdrop-blur flex items-center justify-center p-4"
           >
-            <div className="flex justify-between items-center px-6 py-4 border-b border-zinc-800">
-              <h2 className="text-xl text-white font-semibold">
-                Apply for Task
-              </h2>
-              <button onClick={resetAndClose}>
-                <X className="text-zinc-400 hover:text-white" />
-              </button>
-            </div>
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md bg-black border border-zinc-800 rounded-2xl"
+            >
+              <div className="flex justify-between items-center px-6 py-4 border-b border-zinc-800">
+                <h2 className="text-xl text-white font-semibold">
+                  Apply for Task
+                </h2>
+                <button onClick={resetAndClose}>
+                  <X className="text-zinc-400 hover:text-white" />
+                </button>
+              </div>
 
-            <div className="max-h-[75vh] overflow-y-auto px-6 py-4 scrollbar-hide">
-              {success ? (
+              <div className="max-h-[75vh] overflow-y-auto px-6 py-4 scrollbar-hide">
+                {/* Loading state while checking duplicate */}
+                {checkingDuplicate ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Loader2 className="w-12 h-12 animate-spin text-zinc-400 mb-4" />
+                    <p className="text-zinc-400">Checking application status...</p>
+                  </div>
+                ) : alreadyApplied ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <AlertCircle className="w-16 h-16 text-yellow-500 mb-4" />
+                    <h3 className="text-white text-xl font-semibold">
+                      Already Applied
+                    </h3>
+                    <p className="text-zinc-400 mt-2">
+                      You have already submitted an application for this task.
+                    </p>
+                    <button
+                      onClick={resetAndClose}
+                      className="mt-6 px-6 py-2 bg-zinc-800 text-white rounded-full font-medium hover:bg-zinc-700 transition"
+                    >
+                      Close
+                    </button>
+                  </div>
+                ) : success ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <CheckCircle className="w-16 h-16 text-green-500 mb-4" />
                   <h3 className="text-white text-xl font-semibold">
@@ -228,11 +356,12 @@ const ApplicationModal = ({ isOpen, onClose, task, onSuccess }) => {
                   </button>
                 </>
               )}
-            </div>
+              </div>
+            </motion.div>
           </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>,
+        )}
+      </AnimatePresence>
+    </ModalErrorBoundary>,
     document.body
   );
 };

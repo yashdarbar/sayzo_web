@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { getTasks, auth, getApplicationsByApplicant } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import {
+  subscribeToApprovedTasks,
+  subscribeToApplicationsByApplicant
+} from "@/lib/firebase";
 import { jobs as dummyJobs } from "@/public/data/job";
+import { useAuth } from "@/app/Context/AuthContext";
 
 import JobCard from "@/components/Job/JobCard";
 import JobDetailPanel from "@/components/Job/JobDetailPanel";
@@ -11,7 +14,7 @@ import JobBottomSheet from "@/components/Job/JobBottomSheet";
 import SearchWithPagination from "@/components/SearchWithPagination";
 import CustomIcons from "@/components/CustomIcons";
 import MegaMenu from "./MegaMenu";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 
 // Map Firestore task to job card format
 const mapTaskToJob = (task) => ({
@@ -36,48 +39,90 @@ const mapTaskToJob = (task) => ({
   duration: task.duration || "Flexible",
 });
 
-const UserPage = () => {
+const UserPage = ({ mode = "live" }) => {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [selectedJob, setSelectedJob] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [isMobile, setIsMobile] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
   const [myApplications, setMyApplications] = useState([]);
 
-  /* ================= FETCH TASKS FROM FIREBASE ================= */
-  useEffect(() => {
-    // Listen for auth state to fetch tasks only when authenticated
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setCurrentUser(user);
-        // User is authenticated, fetch from Firebase and combine with dummy data
-        try {
-          const [tasks, applications] = await Promise.all([
-            getTasks(),
-            getApplicationsByApplicant(user.uid)
-          ]);
-          const mappedJobs = tasks.map(mapTaskToJob);
-          // Show real tasks at top + dummy data below
-          setJobs([...mappedJobs, ...dummyJobs]);
-          setMyApplications(applications);
-        } catch (error) {
-          console.error("Error fetching tasks:", error);
-          setJobs(dummyJobs);
-          setMyApplications([]);
-        }
-      } else {
-        // Not authenticated, use dummy data (no error)
-        setCurrentUser(null);
-        setJobs(dummyJobs);
-        setMyApplications([]);
-      }
-      setLoading(false);
-    });
+  // Use centralized auth context
+  const { user: currentUser } = useAuth();
 
-    return () => unsubscribe();
+  // Retry handler for error recovery
+  const handleRetry = useCallback(() => {
+    setError("");
+    setLoading(true);
+    // Force re-mount by updating key (subscriptions will re-establish)
+    window.location.reload();
   }, []);
+
+  /* ================= REAL-TIME TASKS SUBSCRIPTION ================= */
+  useEffect(() => {
+    // Showcase mode: Show only dummy data, no auth required
+    if (mode === "showcase") {
+      setJobs(dummyJobs);
+      setMyApplications([]);
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    // Real-time subscription to approved tasks
+    const unsubscribeTasks = subscribeToApprovedTasks(
+      (tasks) => {
+        if (!isMounted) return;
+        const mappedJobs = tasks.map(mapTaskToJob);
+        setJobs(mappedJobs);
+        setLoading(false);
+        setError("");
+      },
+      (err) => {
+        if (!isMounted) return;
+        console.error("Tasks subscription error:", err);
+        setError("Failed to load tasks. Please try again.");
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      if (unsubscribeTasks) unsubscribeTasks();
+    };
+  }, [mode]);
+
+  /* ================= APPLICATIONS SUBSCRIPTION ================= */
+  useEffect(() => {
+    if (mode === "showcase" || !currentUser) {
+      setMyApplications([]);
+      return;
+    }
+
+    let isMounted = true;
+
+    // Real-time subscription to user's applications
+    const unsubscribeApps = subscribeToApplicationsByApplicant(
+      currentUser.uid,
+      (applications) => {
+        if (!isMounted) return;
+        setMyApplications(applications);
+      },
+      (err) => {
+        if (!isMounted) return;
+        console.error("Applications subscription error:", err);
+        // Don't show error for applications - just log it
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      if (unsubscribeApps) unsubscribeApps();
+    };
+  }, [mode, currentUser]);
 
   /* ================= SCREEN SIZE ================= */
   useEffect(() => {
@@ -135,13 +180,31 @@ const UserPage = () => {
     return task.giverId === currentUser.uid;
   };
 
-  const handleApplicationSuccess = () => {
-    if (currentUser) {
-      getApplicationsByApplicant(currentUser.uid)
-        .then(setMyApplications)
-        .catch(console.error);
-    }
-  };
+  const handleApplicationSuccess = useCallback(() => {
+    // With real-time subscriptions, applications will auto-update
+    // This callback can still be used for optimistic UI updates if needed
+    console.log("Application submitted - subscription will auto-update");
+  }, []);
+
+  /* ================= ERROR STATE ================= */
+  if (error && !loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center max-w-md mx-auto px-4">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-800 mb-2">Something went wrong</h3>
+          <p className="text-gray-500 mb-6">{error}</p>
+          <button
+            onClick={handleRetry}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary-btn text-white rounded-full font-medium hover:bg-opacity-90 transition"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   /* ================= LOADING STATE ================= */
   if (loading) {
@@ -206,6 +269,7 @@ const UserPage = () => {
                 hasApplied={hasApplied(selectedJob?.id)}
                 isOwnTask={isOwnTask(selectedJob)}
                 onApplicationSuccess={handleApplicationSuccess}
+                mode={mode}
               />
             </section>
           )}
@@ -257,6 +321,7 @@ const UserPage = () => {
               hasApplied={hasApplied(selectedJob?.id)}
               isOwnTask={isOwnTask(selectedJob)}
               onApplicationSuccess={handleApplicationSuccess}
+              mode={mode}
             />
           )}
         </section>
