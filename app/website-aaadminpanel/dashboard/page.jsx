@@ -64,7 +64,7 @@ export default function AdminDashboard() {
       setSelectedTask(null);
       setShowRejectModal(false);
       setShowEditModal(false);
-      router.push("/admin");
+      router.push("/website-aaadminpanel");
     } else {
       // Admin authenticated - fetch tasks
       fetchTasks();

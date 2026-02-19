@@ -103,7 +103,7 @@ const AdminAuthModal = ({ onSuccess }) => {
 
     try {
       // Store return URL for after magic link sign-in
-      safeSetLocalStorage("sayzo_auth_return", "/admin/dashboard");
+      safeSetLocalStorage("sayzo_auth_return", "/website-aaadminpanel/dashboard");
       await sendMagicLink(email);
       setLinkSent(true);
     } catch (err) {

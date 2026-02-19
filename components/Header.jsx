@@ -34,7 +34,7 @@ const menuVariants = {
 const Header = () => {
   const pathname = usePathname();
   const router = useRouter();
-  const hideMegaMenu = pathname === "/use-cases" || pathname === "/track-tasks" || pathname === "/live-tasks" || pathname.startsWith("/admin");
+  const hideMegaMenu = pathname === "/use-cases" || pathname === "/track-tasks" || pathname === "/live-tasks" || pathname.startsWith("/website-aaadminpanel");
 
   const [open, setOpen] = useState(false);
   const [isWaitlistOpen, setIsWaitlistOpen] = useState(false);

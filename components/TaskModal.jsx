@@ -432,7 +432,7 @@ const TaskModal = ({ isOpen, onClose }) => {
 
                     <input
                       className={input}
-                      placeholder="Duration *"
+                      placeholder="Duration (3 hours, 5 days, 1 month) *"
                       name="duration"
                       value={form.duration}
                       onChange={handleChange}

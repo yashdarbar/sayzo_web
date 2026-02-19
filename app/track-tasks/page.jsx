@@ -402,7 +402,7 @@ export default function TrackTasksPage() {
                   </div>
                 ) : filteredTasks.length === 0 ? (
                   <div className="text-center py-8 text-gray-400">
-                    No {activeTab} tasks found
+                    You haven't posted any {activeTab} task yet
                   </div>
                 ) : (
                   filteredTasks.map((task) => (
@@ -562,6 +562,15 @@ export default function TrackTasksPage() {
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
                     <p className="text-yellow-700 text-sm">
                       <strong>Pending Approval:</strong> Your task is being reviewed by admin. Once approved, it will be visible to task doers.
+                    </p>
+                  </div>
+                )}
+
+                {/* Show approved notice when no applicants yet */}
+                {selectedTask?.status === TASK_STATUS.APPROVED && applicants.length === 0 && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                    <p className="text-green-700 text-sm">
+                      <strong>Approved:</strong> The task you posted has been verified and is now live on sayzo.in. Keep checking — you'll get interested applicants soon!
                     </p>
                   </div>
                 )}

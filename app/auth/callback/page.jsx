@@ -36,7 +36,7 @@ const validateReturnUrl = (url) => {
 
   // Ensure no query params that could redirect externally
   // Allow only specific safe paths
-  const allowedPaths = ["/", "/live-tasks", "/track-tasks", "/browse-tasks", "/admin/dashboard", "/use-cases"];
+  const allowedPaths = ["/", "/live-tasks", "/track-tasks", "/browse-tasks", "/website-aaadminpanel/dashboard", "/use-cases"];
   const pathOnly = trimmed.split("?")[0].split("#")[0];
 
   // Check if path starts with any allowed path

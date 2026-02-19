@@ -15,12 +15,12 @@ export default function AdminLoginPage() {
   useEffect(() => {
     // Check if already logged in as admin
     if (!isLoading && user && isAdmin) {
-      router.push("/admin/dashboard");
+      router.push("/website-aaadminpanel/dashboard");
     }
   }, [user, isAdmin, isLoading, router]);
 
   const handleAuthSuccess = (user) => {
-    router.push("/admin/dashboard");
+    router.push("/website-aaadminpanel/dashboard");
   };
 
   // Show loading while checking auth state

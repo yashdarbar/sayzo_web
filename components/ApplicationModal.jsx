@@ -221,7 +221,7 @@ const ApplicationModal = ({ isOpen, onClose, task, onSuccess, currentUser }) => 
             >
               <div className="flex justify-between items-center px-6 py-4 border-b border-zinc-800">
                 <h2 className="text-xl text-white font-semibold">
-                  Apply for Task
+                  Apply for this Task
                 </h2>
                 <button onClick={resetAndClose}>
                   <X className="text-zinc-400 hover:text-white" />
@@ -283,7 +283,7 @@ const ApplicationModal = ({ isOpen, onClose, task, onSuccess, currentUser }) => 
 
                   <input
                     className={input}
-                    placeholder="Your Role/Profession *"
+                    placeholder="Your Role/Profession (UI/UX Designer, Flutter Developer, Tutor etc) *"
                     name="applicantRole"
                     value={form.applicantRole}
                     onChange={handleChange}
@@ -291,7 +291,7 @@ const ApplicationModal = ({ isOpen, onClose, task, onSuccess, currentUser }) => 
 
                   <textarea
                     className={`${input} h-24 resize-none`}
-                    placeholder="Why should you be selected? Describe your experience... *"
+                    placeholder="Why are you the right fit? Share relevant experience, similar work, or approach. *"
                     name="description"
                     value={form.description}
                     onChange={handleChange}
