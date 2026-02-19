@@ -339,11 +339,11 @@ export default function TrackTasksPage() {
               <button
                 onClick={() => handleViewModeChange(viewMode === 'giver' ? 'doer' : 'giver')}
                 className={`relative w-24 h-8 rounded-full transition-colors duration-200 border ${
-                  viewMode === 'giver' ? 'bg-white border-gray-300' : 'bg-[#10A37F] border-[#10A37F]'
+                  viewMode === 'giver' ? 'bg-white border-gray-300' : 'bg-black border-black'
                 }`}
               >
                 <div className={`absolute top-0.5 bottom-0.5 px-3 rounded-full shadow-md transition-all duration-200 flex items-center justify-center text-sm font-semibold ${
-                  viewMode === 'giver' ? 'left-0.5 bg-[#10A37F] text-white' : 'right-0.5 bg-white text-[#10A37F]'
+                  viewMode === 'giver' ? 'left-0.5 bg-[#10A37F] text-white' : 'right-0.5 bg-white text-black'
                 }`}>
                   {viewMode === 'giver' ? 'Giver' : 'Doer'}
                 </div>
