@@ -35,6 +35,8 @@ export default function TrackTasksPage() {
   const [doerTasks, setDoerTasks] = useState({})  // Cache task details by taskId
   const [selectedApplicationId, setSelectedApplicationId] = useState(null)
   const [doerLoading, setDoerLoading] = useState(false)
+  const [showBetaInfo, setShowBetaInfo] = useState(false)
+  const [showDoerInfo, setShowDoerInfo] = useState(false)
 
   const unsubscribeTasksRef = useRef(null)
 
@@ -348,14 +350,38 @@ export default function TrackTasksPage() {
       <div className="max-w-350 mx-auto px-4">
         {/* Banner */}
         <div className="relative text-white px-4 py-6 md:px-8 md:py-8 rounded-2xl" style={{ background: 'linear-gradient(to right, #22E200, #02D04D)' }}>
-          {/* Info button with hover tooltip */}
+          {/* Info button with hover (desktop) and click (mobile) tooltip */}
           <div className="absolute top-3 right-3 group">
-            <button className="w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors">
+            <button
+              onClick={() => setShowBetaInfo(!showBetaInfo)}
+              className="w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+            >
               <Info className="w-4 h-4 text-white" />
             </button>
-            {/* Tooltip */}
-            <div className="absolute right-0 top-8 w-72 md:w-80 p-3 bg-white text-gray-700 text-sm rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-              You're in our Beta phase. No algorithms yet—just real execution. Even in this early version, 100+ TaskGivers have been served. We've transitioned from a WhatsApp community model to a proper web platform. Beta 2.0 launches soon, bringing the true 10-minute matching magic.
+            {/* Tooltip - visible on hover (desktop) or click (mobile) */}
+            <div className={`absolute right-0 top-10 w-72 md:w-80 bg-white rounded-lg shadow-xl z-50 transition-all duration-200 overflow-hidden
+              ${showBetaInfo ? 'opacity-100 visible' : 'opacity-0 invisible lg:group-hover:opacity-100 lg:group-hover:visible'}`}
+            >
+              {/* Arrow pointer */}
+              <div className="absolute -top-2 right-3 w-4 h-4 bg-white rotate-45 shadow-sm"></div>
+              {/* Header */}
+              <div className="relative flex items-center justify-between p-3 border-b border-gray-100 bg-white">
+                <div className="flex items-center gap-2">
+                  <Info className="w-4 h-4 text-gray-800" />
+                  <span className="font-semibold text-gray-800">Disclaimer</span>
+                </div>
+                {/* Close button - visible on mobile */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowBetaInfo(false); }}
+                  className="lg:hidden w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              {/* Content */}
+              <p className="p-3 text-gray-600 text-sm leading-relaxed">
+                You're in our Beta phase. No algorithms yet, just real execution. Even in this early version, 100+ TaskGivers have been served. We've transitioned from a WhatsApp community model to a proper web platform. Beta 2.0 launches soon, bringing the true 10-minute matching magic.
+              </p>
             </div>
           </div>
           <h1 className="font-semibold text-center text-pretty text-xl md:text-2xl lg:text-[34px] lg:leading-tight">
@@ -549,7 +575,7 @@ export default function TrackTasksPage() {
         </div>
 
           {/* Right Panel - Applicants (Giver) or Application Details (Doer) */}
-          <div className={`bg-white rounded-lg p-4 md:p-6 ${
+          <div className={`relative bg-white rounded-lg p-4 md:p-6 ${
             viewMode === 'giver'
               ? (!selectedTaskId ? 'hidden lg:block' : 'block')
               : (!selectedApplicationId ? 'hidden lg:block' : 'block')
@@ -562,6 +588,44 @@ export default function TrackTasksPage() {
               <ChevronLeft className="w-5 h-5" />
               Back to {viewMode === 'giver' ? 'tasks' : 'applications'}
             </button>
+
+            {/* Doer Info Button - only visible in doer view */}
+            {viewMode === 'doer' && (
+              <div className="absolute top-4 right-4 group z-10">
+                <button
+                  onClick={() => setShowDoerInfo(!showDoerInfo)}
+                  className="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+                >
+                  <Info className="w-4 h-4 text-gray-800" />
+                </button>
+                {/* Tooltip - visible on hover (desktop) or click (mobile) */}
+                <div className={`absolute right-0 top-10 w-72 md:w-80 bg-white rounded-lg shadow-xl z-50 transition-all duration-200 overflow-hidden
+                  ${showDoerInfo ? 'opacity-100 visible' : 'opacity-0 invisible lg:group-hover:opacity-100 lg:group-hover:visible'}`}
+                >
+                  {/* Arrow pointer */}
+                  <div className="absolute -top-2 right-3 w-4 h-4 bg-white rotate-45 shadow-sm"></div>
+                  {/* Header */}
+                  <div className="relative flex items-center justify-between p-3 border-b border-gray-100 bg-white">
+                    <div className="flex items-center gap-2">
+                      <Info className="w-4 h-4 text-gray-800" />
+                      <span className="font-semibold text-gray-800">Disclaimer</span>
+                    </div>
+                    {/* Close button - visible on mobile */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowDoerInfo(false); }}
+                      className="lg:hidden w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {/* Content - two paragraphs */}
+                  <div className="p-3 text-gray-600 text-sm leading-relaxed space-y-3">
+                    <p>When you accept a task as a TaskDoer, your application is sent to the TaskGiver. They review all applicants and select the best fit based on their requirements. If selected, you'll be able to view the TaskGiver's contact details and connect directly to begin the work. You can track your application status anytime within the platform.</p>
+                    <p>For now, Sayzo operates solely as a connecting platform. With the full app launch, we'll evolve into a stronger infrastructure, helping you receive consistent tasks, greater opportunities, and additional support as a facilitator. Beta 2.0 is launching soon.</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {viewMode === 'giver' ? (
               // Task Giver View - Applicants Panel
