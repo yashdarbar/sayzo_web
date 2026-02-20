@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -43,6 +43,17 @@ const Header = () => {
 
   // Use centralized auth context instead of local listener
   const { user, userProfile, isAdmin, logout } = useAuth();
+
+  // Auto-open TaskModal when user returns from magic link with pending task
+  useEffect(() => {
+    if (user) {
+      const pendingTask = localStorage.getItem("sayzo_pending_task");
+      if (pendingTask) {
+        setIsTaskOpen(true);
+        localStorage.removeItem("sayzo_pending_task");
+      }
+    }
+  }, [user]);
 
   // Logout handler
   const handleLogout = async () => {
