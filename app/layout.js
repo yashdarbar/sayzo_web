@@ -66,10 +66,22 @@ export const metadata = {
 
 
 export default function RootLayout({ children }) {
-  
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "SAYZO",
+    "alternateName": ["Sayzo", "sayzo.in"],
+    "url": "https://sayzo.in/"
+  };
+
   return (
     <html lang="en"  className={`${inter.variable} ${instrumentSerif.variable}`}>
-      
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <PolicyProvider>
       <AuthProvider>
       <body>
