@@ -3,91 +3,91 @@
 
 export const MOCK_JOBS = [
   {
-    id: '1',
+    id: 'mock-1',
     title: 'Full-Stack Developers',
     tags: ['Tartu', 'Full-time'],
     category: 'Engineering',
     description: 'Due to growing workload, we are looking for experienced and talented Full-Stack Developers to join our fast-paced Engineering team. You will work closely with Product, Design and Marketing to analyze, develop, debug, test, roll-out and support new and existing product features.'
   },
   {
-    id: '2',
+    id: 'mock-2',
     title: 'Application developer (react native)',
     tags: ['Tartu', 'Full-time'],
     category: 'Engineering',
     description: 'Due to growing workload, we are looking for experienced and talented Full-Stack Developers to join our fast-paced Engineering team.'
   },
   {
-    id: '3',
+    id: 'mock-3',
     title: 'Senior Product designer',
     tags: ['Hybrid', 'Tallinn', 'Full-time'],
     category: 'Design',
     description: "Since 2019 we've worked on 30+ major projects from 8 different industries that are being used by 500,000+ users and 1000+ businesses."
   },
   {
-    id: '4',
+    id: 'mock-4',
     title: 'Product Manager',
     tags: ['Remote', 'Netherlands', 'Full-time'],
     category: 'Product',
     description: 'If you are PM and you eager to join our fast-paced Engineering team. You will work closely with Product, Design and Marketing.'
   },
   {
-    id: '5',
+    id: 'mock-5',
     title: 'Product Owner',
     tags: ['Tartu', 'Full-time'],
     category: 'Product',
     description: "We've worked on 30+ major projects from 8 different industries that are being used by 500,000+ users."
   },
   {
-    id: '6',
+    id: 'mock-6',
     title: 'DevOps Lead',
     tags: ['Remote', 'Full-time'],
     category: 'Engineering',
     description: 'Lead our infrastructure efforts as we scale to support millions of users globally. Expertise in AWS and Kubernetes required.'
   },
   {
-    id: '7',
+    id: 'mock-7',
     title: 'Marketing Specialist',
     tags: ['Tallinn', 'Part-time'],
     category: 'Marketing',
     description: 'Help us grow our brand presence across European markets with creative campaigns and data-driven insights.'
   },
   {
-    id: '8',
+    id: 'mock-8',
     title: 'Backend Engineer (Go)',
     tags: ['Remote', 'Full-time'],
     category: 'Engineering',
     description: 'Build high-performance microservices for our core platform using Go and gRPC.'
   },
   {
-    id: '9',
+    id: 'mock-9',
     title: 'Customer Operations Lead',
     tags: ['Remote', 'Full-time'],
     category: 'Operation',
     description: 'Manage our customer support operations and ensure high satisfaction rates across all our service channels.'
   },
   {
-    id: '10',
+    id: 'mock-10',
     title: 'Logistics Coordinator',
     tags: ['Tartu', 'Full-time'],
     category: 'Operation',
     description: 'Optimize our supply chain and delivery schedules to meet growing demand in the Baltic region.'
   },
   {
-    id: '11',
+    id: 'mock-11',
     title: 'HR Operations Manager',
     tags: ['Tallinn', 'Full-time'],
     category: 'Operation',
     description: 'Oversee internal HR processes and employee lifecycle operations for our growing international team.'
   },
   {
-    id: '12',
+    id: 'mock-12',
     title: 'Security Operations Analyst',
     tags: ['Remote', 'Full-time'],
     category: 'Operation',
     description: 'Monitor systems for security threats and implement operational protocols for rapid incident response.'
   },
   {
-    id: '13',
+    id: 'mock-13',
     title: 'Social Media Manager',
     tags: ['Remote', 'Full-time'],
     category: 'Marketing',

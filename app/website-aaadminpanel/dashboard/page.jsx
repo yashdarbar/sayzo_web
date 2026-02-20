@@ -21,6 +21,7 @@ import {
 import { getPendingTasks, getTasksByStatus, updateTaskStatus, updateTask, deleteTask } from "@/lib/firebase";
 import { TASK_STATUS } from "@/lib/constants";
 import { useAuth } from "@/app/Context/AuthContext";
+import AdminLayout from "@/components/admin/AdminLayout";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -55,21 +56,14 @@ export default function AdminDashboard() {
   // Use centralized auth context instead of own listener
   const { user, isAdmin, isLoading: authLoading } = useAuth();
 
-  // Check admin auth on mount and redirect if not admin
+  // Fetch tasks when authenticated
   useEffect(() => {
     if (authLoading) return;
 
-    if (!user || !isAdmin) {
-      // Not authenticated or not admin - redirect
-      setSelectedTask(null);
-      setShowRejectModal(false);
-      setShowEditModal(false);
-      router.push("/website-aaadminpanel");
-    } else {
-      // Admin authenticated - fetch tasks
+    if (user && isAdmin) {
       fetchTasks();
     }
-  }, [user, isAdmin, authLoading, router]);
+  }, [user, isAdmin, authLoading]);
 
   // Handle screen resize
   useEffect(() => {
@@ -681,7 +675,8 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-white pt-32">
+    <AdminLayout>
+    <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="bg-gray-50 border-b border-gray-200 px-6 py-4">
         <div className="max-w-350 mx-auto flex justify-between items-center">
@@ -1019,5 +1014,6 @@ export default function AdminDashboard() {
         </div>
       )}
     </div>
+    </AdminLayout>
   );
 }

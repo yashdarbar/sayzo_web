@@ -17,7 +17,7 @@ const BuildForWork = () => {
           <span className="font-bold text-gray-700">40,000+ potential skills.</span>
           Yet people look online for help while talent sits next door, unused.{" "}
           <span className="font-bold text-gray-700">SAYZO</span> connects local
-          talent with real work — instantly.
+          talent with real work - instantly.
         </p>
       </div>
 
