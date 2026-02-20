@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 import { Loader2, Plus, ChevronDown, X, Briefcase } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/app/Context/AuthContext';
-import { subscribeToJobs, addJob, updateJob, deleteJob, toggleJobPublished } from '@/lib/firebase';
+import { subscribeToJobs, addJob, updateJob, deleteJob, toggleJobPublished, getJobApplicationCount } from '@/lib/firebase';
 import { JOB_CATEGORIES } from '@/lib/constants';
 import AdminLayout from '@/components/admin/AdminLayout';
 import AdminJobCard from '@/components/admin/AdminJobCard';
 import JobFormModal from '@/components/admin/JobFormModal';
+import JobApplicationsModal from '@/components/admin/JobApplicationsModal';
 
 export default function JobsManagementPage() {
   const router = useRouter();
@@ -29,6 +30,11 @@ export default function JobsManagementPage() {
   const [editingJob, setEditingJob] = useState(null);
   const [formLoading, setFormLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+
+  // Applications modal states
+  const [showApplicationsModal, setShowApplicationsModal] = useState(false);
+  const [selectedJobForApplications, setSelectedJobForApplications] = useState(null);
+  const [applicationCounts, setApplicationCounts] = useState({});
 
   // Subscribe to jobs
   useEffect(() => {
@@ -53,6 +59,31 @@ export default function JobsManagementPage() {
 
     return () => unsubscribe();
   }, [user, isAdmin, authLoading, router]);
+
+  // Fetch application counts when jobs change
+  useEffect(() => {
+    const fetchCounts = async () => {
+      const counts = {};
+      for (const job of jobs) {
+        try {
+          counts[job.id] = await getJobApplicationCount(job.id);
+        } catch (error) {
+          counts[job.id] = 0;
+        }
+      }
+      setApplicationCounts(counts);
+    };
+
+    if (jobs.length > 0) {
+      fetchCounts();
+    }
+  }, [jobs]);
+
+  // Handle view applications
+  const handleViewApplications = (job) => {
+    setSelectedJobForApplications(job);
+    setShowApplicationsModal(true);
+  };
 
   // Filter jobs by category and status
   const filteredJobs = jobs.filter((job) => {
@@ -300,6 +331,8 @@ export default function JobsManagementPage() {
                     onEdit={openEditModal}
                     onDelete={handleDeleteJob}
                     onTogglePublish={handleTogglePublish}
+                    onViewApplications={handleViewApplications}
+                    applicationCount={applicationCounts[job.id] || 0}
                     isDeleting={deletingId === job.id}
                     isTogglingPublish={togglingPublishId === job.id}
                   />
@@ -319,6 +352,16 @@ export default function JobsManagementPage() {
           onSubmit={editingJob ? handleEditJob : handleCreateJob}
           initialData={editingJob}
           isLoading={formLoading}
+        />
+
+        {/* Job Applications Modal */}
+        <JobApplicationsModal
+          isOpen={showApplicationsModal}
+          onClose={() => {
+            setShowApplicationsModal(false);
+            setSelectedJobForApplications(null);
+          }}
+          job={selectedJobForApplications}
         />
       </div>
     </AdminLayout>
