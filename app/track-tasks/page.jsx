@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronRight, ChevronDown, ChevronLeft, Loader2, Clock, CheckCircle, XCircle, Eye, X } from 'lucide-react'
+import { ChevronRight, ChevronDown, ChevronLeft, Loader2, Clock, CheckCircle, XCircle, Eye, X, Info } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import TaskGiverAuthModal from '@/components/TaskGiverAuthModal'
 import { subscribeToTasksByGiver, subscribeToApplicationsByTask, subscribeToApplicationsByApplicant, updateApplicationStatus, getTaskById, markTaskAsComplete } from '@/lib/firebase'
@@ -347,7 +347,17 @@ export default function TrackTasksPage() {
       {isAuthenticated && (
       <div className="max-w-350 mx-auto px-4">
         {/* Banner */}
-        <div className="text-white px-4 py-6 md:px-8 md:py-8 rounded-2xl" style={{ background: 'linear-gradient(to right, #22E200, #02D04D)' }}>
+        <div className="relative text-white px-4 py-6 md:px-8 md:py-8 rounded-2xl" style={{ background: 'linear-gradient(to right, #22E200, #02D04D)' }}>
+          {/* Info button with hover tooltip */}
+          <div className="absolute top-3 right-3 group">
+            <button className="w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors">
+              <Info className="w-4 h-4 text-white" />
+            </button>
+            {/* Tooltip */}
+            <div className="absolute right-0 top-8 w-72 md:w-80 p-3 bg-white text-gray-700 text-sm rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+              You're in our Beta phase. No algorithms yet—just real execution. Even in this early version, 100+ TaskGivers have been served. We've transitioned from a WhatsApp community model to a proper web platform. Beta 2.0 launches soon, bringing the true 10-minute matching magic.
+            </div>
+          </div>
           <h1 className="font-semibold text-center text-pretty text-xl md:text-2xl lg:text-[34px] lg:leading-tight">
             Beta Access: Find verified skills (online & offline) in 10<br className="hidden md:block" />
             minutes. Zero platform fee for Beta users.
